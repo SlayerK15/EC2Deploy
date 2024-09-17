@@ -1,0 +1,31 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches:
+      - main  
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Install SSH Client
+        run: sudo apt-get install -y sshpass
+
+      - name: Add SSH Key
+        uses: webfactory/ssh-agent@v0.7.0
+        with:
+          ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
+
+      - name: Deploy to EC2
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@your_ec2_public_ip '
+          cd /home/ubuntu/samplestore || git clone https://github.com/SlayerK15/EC2Deploy.git /home/ubuntu/samplestore
+          cd /home/ubuntu/samplestore
+          git pull
+          docker-compose down
+          docker-compose up -d --build
+          '
