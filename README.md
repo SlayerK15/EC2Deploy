@@ -1,70 +1,109 @@
-<p align="center">
-  <a href="https://www.medusajs.com">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://user-images.githubusercontent.com/59018053/229103275-b5e482bb-4601-46e6-8142-244f531cebdb.svg">
-    <source media="(prefers-color-scheme: light)" srcset="https://user-images.githubusercontent.com/59018053/229103726-e5b529a3-9b3f-4970-8a1f-c6af37f087bf.svg">
-    <img alt="Medusa logo" src="https://user-images.githubusercontent.com/59018053/229103726-e5b529a3-9b3f-4970-8a1f-c6af37f087bf.svg">
-    </picture>
-  </a>
-</p>
-<h1 align="center">
-  Medusa
-</h1>
+### Deployment of Medusa Backend to AWS EC2 Using GitHub Actions
 
-<h4 align="center">
-  <a href="https://docs.medusajs.com">Documentation</a> |
-  <a href="https://www.medusajs.com">Website</a>
-</h4>
+This document outlines the process of deploying a Medusa backend application to an AWS EC2 instance using GitHub Actions to automate the deployment process. The application is set to run on port 9000.
 
-<p align="center">
-  Building blocks for digital commerce
-</p>
-<p align="center">
-  <a href="https://github.com/medusajs/medusa/blob/master/CONTRIBUTING.md">
-    <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat" alt="PRs welcome!" />
-  </a>
-    <a href="https://www.producthunt.com/posts/medusa"><img src="https://img.shields.io/badge/Product%20Hunt-%231%20Product%20of%20the%20Day-%23DA552E" alt="Product Hunt"></a>
-  <a href="https://discord.gg/xpCwq3Kfn8">
-    <img src="https://img.shields.io/badge/chat-on%20discord-7289DA.svg" alt="Discord Chat" />
-  </a>
-  <a href="https://twitter.com/intent/follow?screen_name=medusajs">
-    <img src="https://img.shields.io/twitter/follow/medusajs.svg?label=Follow%20@medusajs" alt="Follow @medusajs" />
-  </a>
-</p>
+---
 
-## Compatibility
+### Step-by-Step Process
 
-This starter is compatible with versions >= 1.8.0 of `@medusajs/medusa`. 
+#### 1. **Creating the EC2 Instance and Key Pair**
+- **EC2 Setup**: Create a new EC2 instance with the following configurations:
+  - **Instance type**: `t2.small`
+  - **Operating system**: Ubuntu 22.04
+  - **Security group**: Allow inbound traffic on port 9000 for the Medusa backend application.
+- **Key Pair**: Generate a new key pair to securely access the EC2 instance via SSH.
 
-## Getting Started
+#### 2. **Accessing the EC2 Instance**
+Use the following command to access the EC2 instance via SSH:
 
-Visit the [Quickstart Guide](https://docs.medusajs.com/create-medusa-app) to set up a server.
+```bash
+ssh -i <key-pair-file> ubuntu@<EC2-public-IP>
+```
 
-Visit the [Docs](https://docs.medusajs.com/development/backend/prepare-environment) to learn more about our system requirements.
+Once inside the EC2 instance, install the necessary tools with the following commands:
 
-## What is Medusa
+```bash
+sudo apt update
+sudo apt install docker docker-compose git -y
+```
 
-Medusa is a set of commerce modules and tools that allow you to build rich, reliable, and performant commerce applications without reinventing core commerce logic. The modules can be customized and used to build advanced ecommerce stores, marketplaces, or any product that needs foundational commerce primitives. All modules are open-source and freely available on npm.
+#### 3. **Generating SSH Keys for GitHub Actions**
+- **SSH Key Generation**: Generate an SSH key pair to establish a secure connection between GitHub Actions and the EC2 instance:
 
-Learn more about [Medusa’s architecture](https://docs.medusajs.com/development/fundamentals/architecture-overview) and [commerce modules](https://docs.medusajs.com/modules/overview) in the Docs.
+```bash
+ssh-keygen -t rsa -b 4096 -C "GithubActions"
+```
 
-## Roadmap, Upgrades & Plugins
+- **Public key**: Add this key to the EC2 instance under `~/.ssh/authorized_keys`.
+- **Private key**: Store this in the GitHub repository as a secret under the name `EC2_SSH_KEY`.
+- **EC2 Public IP**: Store the EC2 instance's public IP as a secret in GitHub, under the name `EC2_IP`.
 
-You can view the planned, started and completed features in the [Roadmap discussion](https://github.com/medusajs/medusa/discussions/categories/roadmap).
+#### 4. **Creating the GitHub Repository**
+- Create a new repository called `EC2Deploy` to manage the deployment process.
+- Clone the previous Task-3 project to your local machine, and within the `.github/workflows/` directory, create a new workflow file named `deploy.yml` to handle the deployment.
 
-Follow the [Upgrade Guides](https://docs.medusajs.com/upgrade-guides/) to keep your Medusa project up-to-date.
+#### 5. **Writing the GitHub Actions Workflow**
 
-Check out all [available Medusa plugins](https://medusajs.com/plugins/).
+```yaml
+name: Deploy to EC2
 
-## Community & Contributions
+on:
+  push:
+    branches:
+      - main
 
-The community and core team are available in [GitHub Discussions](https://github.com/medusajs/medusa/discussions), where you can ask for support, discuss roadmap, and share ideas.
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
 
-Join our [Discord server](https://discord.com/invite/medusajs) to meet other community members.
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
 
-## Other channels
+      - name: Install SSH Client
+        run: sudo apt-get install -y sshpass
 
-- [GitHub Issues](https://github.com/medusajs/medusa/issues)
-- [Twitter](https://twitter.com/medusajs)
-- [LinkedIn](https://www.linkedin.com/company/medusajs)
-- [Medusa Blog](https://medusajs.com/blog/)
+      - name: Add SSH Key
+        uses: webfactory/ssh-agent@v0.7.0
+        with:
+          ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
+
+      - name: Deploy to EC2
+        run: |
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_IP }} '
+          cd /home/ubuntu/EC2Deploy || git clone https://github.com/SlayerK15/EC2Deploy.git /home/ubuntu/EC2Deploy
+          cd /home/ubuntu/EC2Deploy
+          git pull
+          docker-compose down
+          docker-compose up -d --build
+          '
+```
+
+#### Explanation of Workflow Steps:
+1. **Checkout Code**: This step checks out the code from the GitHub repository to the runner machine.
+2. **Install SSH Client**: Installs `sshpass` to facilitate SSH communication with the EC2 instance.
+3. **Add SSH Key**: Adds the private SSH key stored in GitHub secrets for secure SSH access using the `webfactory/ssh-agent` action.
+4. **Deploy to EC2**: SSHs into the EC2 instance, navigates to the project directory, pulls the latest changes from the repository, and restarts the Docker containers with `docker-compose`.
+
+#### 6. **Pushing Code and Triggering Deployment**
+- After writing the workflow, commit and push the changes to the main branch. This triggers the GitHub Actions workflow and automates the deployment to the EC2 instance.
+- The Medusa backend application will be successfully deployed and run on port 9000.
+
+#### 7. **Verifying the Deployment**
+- Access the EC2 instance via SSH and run the following command to check if the Docker containers are running:
+
+```bash
+docker ps
+```
+
+- You can also check the images with:
+
+```bash
+docker images
+```
+
+These commands will confirm that the Medusa backend is running on the EC2 instance.
+
+---
+
+By following this process, the deployment of the Medusa backend to AWS EC2 using GitHub Actions is automated and can be easily repeated with future updates.
