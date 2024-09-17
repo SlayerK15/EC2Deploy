@@ -22,9 +22,9 @@ jobs:
 
       - name: Deploy to EC2
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@your_ec2_public_ip '
-          cd /home/ubuntu/samplestore || git clone https://github.com/SlayerK15/EC2Deploy.git /home/ubuntu/samplestore
-          cd /home/ubuntu/samplestore
+          ssh -o StrictHostKeyChecking=no ubuntu@13.235.31.64 '
+          cd /home/ubuntu/EC2Deploy || git clone https://github.com/SlayerK15/EC2Deploy.git /home/ubuntu/EC2Deploy
+          cd /home/ubuntu/EC2Deploy
           git pull
           docker-compose down
           docker-compose up -d --build
